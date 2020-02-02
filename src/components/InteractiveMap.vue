@@ -3,7 +3,7 @@
     <span class="title">
       新型冠状病毒肺炎
       <br v-if="window.innerWidth < 640">
-      确证病例分布图
+      境内确证病例分布图
       <template v-if="totalCases"><br><small>全球累积确证总数:</small> <strong>{{totalCases | formatNumber}}</strong></template>
     </span>
     <span class="attribution">
