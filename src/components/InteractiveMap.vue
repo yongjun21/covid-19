@@ -1,5 +1,11 @@
 <template>
   <div class="interactive-map">
+    <span class="title">
+      新型冠状病毒肺炎
+      <br v-if="window.innerWidth < 640">
+      确证病例分布图
+      <template v-if="totalCases"><br><small>全球累积确证总数:</small> <strong>{{totalCases | formatNumber}}</strong></template>
+    </span>
     <span class="attribution">
       <strong>数据来源</strong>: <a href="https://ncov.dxy.cn/ncovh5/view/pneumonia">丁香园</a>
       <template v-if="lastUpdated"><br><strong>最近更新</strong>: {{lastUpdated | formatTimestamp}}</template>
@@ -54,6 +60,7 @@ const CORRECTIONS = [
   { provinceName: '贵州省', givenName: '黔西南州', correctName: '黔西南布依族苗族自治州' },
   { provinceName: '贵州省', givenName: '黔东南州', correctName: '黔东南苗族侗族自治州' },
   { provinceName: '天津市', givenName: '宁河区', correctName: '宁河县' },
+  { provinceName: '甘肃省', givenName: '甘南', correctName: '甘南藏族自治州' },
   { provinceName: '内蒙古自治区', givenName: '赤峰', correctName: ['松山区', '红山区', '元宝山区', '林西县', '宁城县', '克什克腾旗', '巴林左旗', '巴林右旗', '阿鲁科尔沁旗', '翁牛特旗', '喀喇沁旗'] }
 ]
 
@@ -62,10 +69,17 @@ let colorScale = chroma.scale('OrRd').gamma(GAMMA.color)
 export default {
   data () {
     return {
-      lastUpdated: null
+      totalCases: null,
+      lastUpdated: null,
+      window: {
+        innerWidth: window.innerWidth
+      }
     }
   },
   filters: {
+    formatNumber (n) {
+      return n.toLocaleString()
+    },
     formatTimestamp (t) {
       const [date, time] = t.split('T')
       const [, m, d] = date.split('-').map(Number)
@@ -88,7 +102,7 @@ export default {
     }, CHINA))
 
     const nav = new mapboxgl.NavigationControl({ showCompass: false })
-    map.addControl(nav, 'top-left')
+    map.addControl(nav, 'top-right')
     map.removeControl(map._controls[0])
 
     const tooltip = createPopup(TooltipContent, {
@@ -102,7 +116,8 @@ export default {
         url: 'mapbox://yongjun21.china'
       })
 
-      dataPending.then(([provinces, cities, lastUpdated]) => {
+      dataPending.then(([provinces, cities, totalCases, lastUpdated]) => {
+        this.totalCases = totalCases
         this.lastUpdated = lastUpdated
         const toPlot = []
         provinces.forEach(row => {
@@ -268,11 +283,12 @@ function getData () {
       }
       row.matched = matched
     })
+    const totalCases = provinces.reduce((sum, row) => sum + row.confirmedCount, 0)
     const lastUpdated = provinces.reduce((max, row) => row.modifyTime > max ? row.modifyTime : max, '')
-    // cities.filter(row => !row.name).forEach(row => {
+    // cities.filter(row => !row.matched).forEach(row => {
     //   console.log(row.provinceName, row.cityName)
     // })
-    return [provinces, cities, lastUpdated]
+    return [provinces, cities, totalCases, lastUpdated]
   })
 }
 
@@ -298,6 +314,26 @@ function createPopup (Content, options) {
 .interactive-map {
   width: 100%;
   height: 100%;
+
+  .title {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1;
+    padding: 16px 24px;
+    font-size: 32px;
+    line-height: 1.2em;
+    background-color: rgba(128, 128, 128, 0.6);
+    color: white;
+    text-shadow: 1px 1px 2px black;
+    box-shadow: 0 1px 5px darkgrey;
+
+    small {
+      font-size: 0.6em;
+    }
+  }
 
   .attribution {
     display: block;
