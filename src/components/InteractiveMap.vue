@@ -22,7 +22,7 @@ import chroma from 'chroma-js'
 
 import TooltipContent from './TooltipContent'
 
-const GAMMA = { color: 0.2, height: 0.3 }
+const GAMMA = { color: 0.2, height: 0.33 }
 
 const CHINA = {
   center: window.innerWidth < 640 ? [114.384695, 30.667099] : [104.1375915, 31.1040363],
@@ -100,8 +100,8 @@ export default {
           if (!MUNICIPALITIES.includes(row.provinceName)) toPlot.push(row)
         })
 
-        const max = toPlot.reduce((max, row) => row.confirmedCount > max ? row.confirmedCount : max, 0)
-        colorScale.domain([0, max])
+        // const max = toPlot.reduce((max, row) => row.confirmedCount > max ? row.confirmedCount : max, 0)
+        colorScale.domain([0, 1000])
 
         toPlot.forEach(row => {
           const lvl = row.matched.level
