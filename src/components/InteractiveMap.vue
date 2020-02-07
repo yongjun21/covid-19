@@ -15,10 +15,12 @@
 
 <script>
 import Vue from 'vue'
+import chroma from 'chroma-js'
+
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
-import chroma from 'chroma-js'
+import store from '../store'
 
 import TooltipContent from './TooltipContent'
 
@@ -29,22 +31,26 @@ const CHINA = {
   zoom: 4
 }
 
-const MUNICIPALITIES = ['北京市', '天津市', '上海市', '重庆市']
-
-const CORRECTIONS = [
-  { provinceName: '黑龙江省', givenName: '大兴安岭', correctName: '大兴安岭地区' }
-]
-
-let colorScale = chroma.scale('OrRd').gamma(GAMMA.color)
-
 export default {
   data () {
     return {
-      totalCases: null,
-      lastUpdated: null,
       window: {
         innerWidth: window.innerWidth
       }
+    }
+  },
+  computed: {
+    data () {
+      return store.data
+    },
+    loaded () {
+      return store.loaded
+    },
+    totalCases () {
+      return store.totalCases
+    },
+    lastUpdated () {
+      return store.lastUpdated
     }
   },
   filters: {
@@ -58,8 +64,6 @@ export default {
     }
   },
   mounted () {
-    const dataPending = getData()
-
     const map = new mapboxgl.Map(Object.assign({
       container: this.$el,
       style: 'mapbox://styles/yongjun21/ck60blonc363g1ilbygjc6rer',
@@ -81,48 +85,36 @@ export default {
       closeOnClick: false
     })
 
+    const colorScale = chroma.scale('OrRd').gamma(GAMMA.color).domain([0, 1000])
+
     map.on('load', () => {
       map.addSource('china', {
         type: 'vector',
         url: 'mapbox://yongjun21.china'
       })
 
-      dataPending.then(([provinces, cities, totalCases, lastUpdated]) => {
-        this.totalCases = totalCases
-        this.lastUpdated = lastUpdated
-        const toPlot = []
-        provinces.forEach(row => {
-          if (!row.matched) return
-          if (MUNICIPALITIES.includes(row.provinceName)) toPlot.push(row)
-        })
-        cities.forEach(row => {
-          if (!row.matched) return
-          if (!MUNICIPALITIES.includes(row.provinceName)) toPlot.push(row)
-        })
-
-        // const max = toPlot.reduce((max, row) => row.confirmedCount > max ? row.confirmedCount : max, 0)
-        colorScale.domain([0, 1000])
-
-        toPlot.forEach(row => {
-          const lvl = row.matched.level
+      function renderState () {
+        Object.values(store.data).forEach(row => {
           const state = {
-            name: row.cityName || row.provinceName,
-            confirmed: row.confirmedCount,
-            dead: row.deadCount,
-            color: colorScale(row.confirmedCount).hex()
+            name: row.name,
+            confirmed: row.confirmed[0],
+            color: colorScale(row.confirmed[0]).hex()
           }
           map.setFeatureState({
             source: 'china',
-            sourceLayer: 'china_boundaries_l' + lvl,
-            id: row.matched.id
+            sourceLayer: 'china_boundaries_l' + row.lvl,
+            id: row.id
           }, state)
           map.setFeatureState({
             source: 'china',
-            sourceLayer: 'china_places_l' + lvl,
-            id: row.matched.id
+            sourceLayer: 'china_places_l' + row.lvl,
+            id: row.id
           }, state)
         })
-      })
+      }
+
+      if (this.loaded >= 1) renderState()
+      else this.$watch('loaded', renderState)
 
       map.addLayer({
         id: 'l1_data',
