@@ -4,7 +4,7 @@
       新型冠状病毒肺炎
       <br v-if="window.innerWidth < 640">
       境内确证病例分布图
-      <template v-if="totalCases"><br><small>全球累积确证总数:</small> <strong>{{totalCases | formatNumber}}</strong></template>
+      <template v-if="date && totalCases"><br><strong>{{date | formatDate}}</strong> <small>全球累积确证:</small> <strong>{{totalCases | formatNumber}}</strong></template>
     </span>
     <span class="attribution">
       <strong>数据来源</strong>: <a href="https://ncov.dxy.cn/ncovh5/view/pneumonia">丁香园</a>
@@ -31,24 +31,20 @@ const CHINA = {
   zoom: 4
 }
 
+store.initialize().then(() => store.continue())
+
 export default {
+  props: ['progress'],
   data () {
     return {
       window: {
         innerWidth: window.innerWidth
-      }
+      },
+      date: null,
+      totalCases: null
     }
   },
   computed: {
-    data () {
-      return store.data
-    },
-    loaded () {
-      return store.loaded
-    },
-    totalCases () {
-      return store.totalCases
-    },
     lastUpdated () {
       return store.lastUpdated
     }
@@ -61,6 +57,10 @@ export default {
       const [date, time] = t.split('T')
       const [, m, d] = date.split('-').map(Number)
       return `${m}月${d}日 ${time}`
+    },
+    formatDate (date) {
+      const [, m, d] = date.split('-').map(Number)
+      return `${m}月${d}日`
     }
   },
   mounted () {
@@ -70,7 +70,7 @@ export default {
       pitch: 40,
       minZoom: 4,
       maxZoom: 8,
-      scrollZoom: true,
+      scrollZoom: false,
       dragPan: true,
       dragRotate: false,
       accessToken: 'pk.eyJ1IjoieW9uZ2p1bjIxIiwiYSI6ImNpdTY5c2tyZzBqaDgyemxwYjk0Nnlic2UifQ.A5OHCYPcLTupbo1Qi3t5OQ'
@@ -94,27 +94,40 @@ export default {
       })
 
       function renderState () {
-        Object.values(store.data).forEach(row => {
-          const state = {
-            name: row.name,
-            confirmed: row.confirmed[0],
-            color: colorScale(row.confirmed[0]).hex()
-          }
-          map.setFeatureState({
-            source: 'china',
-            sourceLayer: 'china_boundaries_l' + row.lvl,
-            id: row.id
-          }, state)
-          map.setFeatureState({
-            source: 'china',
-            sourceLayer: 'china_places_l' + row.lvl,
-            id: row.id
-          }, state)
-        })
+        const n = store.dates.length
+        this.$watch('progress', progress => {
+          const p = progress(true)
+          let index = Math.floor(p * (n - 1))
+          const t = p * (n - 1) - index
+          index = n - 1 - index
+          Object.values(store.data).forEach(row => {
+            const b = row.cases[index] || 0
+            const a = (index === n - 1) ? b : row.cases[index + 1] || 0
+            const interpolated = a * (1 - t) + b * t
+            const state = {
+              name: row.name,
+              cases: a,
+              height: interpolated,
+              color: colorScale(interpolated).hex()
+            }
+            map.setFeatureState({
+              source: 'china',
+              sourceLayer: 'china_boundaries_l' + row.lvl,
+              id: row.id
+            }, state)
+            map.setFeatureState({
+              source: 'china',
+              sourceLayer: 'china_places_l' + row.lvl,
+              id: row.id
+            }, state)
+          })
+          this.date = store.dates[index]
+          this.totalCases = store.total[index]
+        }, { immediate: true })
       }
 
-      if (this.loaded >= 1) renderState()
-      else this.$watch('loaded', renderState)
+      if (store.ready) renderState.call(this)
+      else this.$watch(() => store.ready, renderState.bind(this))
 
       map.addLayer({
         id: 'l1_data',
@@ -124,7 +137,7 @@ export default {
         paint: {
           'fill-extrusion-height': ['*',
             10000,
-            ['^', ['number', ['feature-state', 'confirmed'], 0], GAMMA.height]
+            ['^', ['number', ['feature-state', 'height'], 0], GAMMA.height]
           ],
           'fill-extrusion-color': ['to-color', ['feature-state', 'color'], colorScale(0).hex()],
           'fill-extrusion-opacity': 1
@@ -139,7 +152,7 @@ export default {
         paint: {
           'fill-extrusion-height': ['*',
             10000,
-            ['^', ['number', ['feature-state', 'confirmed'], 0], GAMMA.height]
+            ['^', ['number', ['feature-state', 'height'], 0], GAMMA.height]
           ],
           'fill-extrusion-color': ['to-color', ['feature-state', 'color'], colorScale(0).hex()],
           'fill-extrusion-opacity': 1
@@ -178,11 +191,17 @@ export default {
       map.on('mousemove', e => {
         const featuresL1 = map.queryRenderedFeatures(e.point, { layers: ['l1_data'] })
         const featuresL2 = map.queryRenderedFeatures(e.point, { layers: ['l2_data'] })
-        if (featuresL2.length > 0 && featuresL2[0].state.confirmed > 0) {
-          const data = [featuresL2[0].properties, featuresL2[0].state]
+        if (featuresL2.length > 0 && featuresL2[0].state.cases > 0) {
+          const data = {
+            properties: featuresL2[0].properties,
+            state: featuresL2[0].state
+          }
           tooltip.setData(data).trackPointer().addTo(map)
         } else if (featuresL1.length > 0) {
-          const data = [featuresL1[0].properties, featuresL1[0].state]
+          const data = {
+            properties: featuresL1[0].properties,
+            state: featuresL1[0].state
+          }
           tooltip.setData(data).trackPointer().addTo(map)
         } else {
           tooltip.setData(null).remove()
@@ -191,70 +210,6 @@ export default {
       map.on('movestart', e => tooltip.setData(null).remove())
     })
   }
-}
-
-function getData () {
-  const NAMES_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/17aJc-9u2H_NRBGKsdbYIzQ-K87X1P4riSew1MBoGcVo/687669852.json'
-  const PROVINCES_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/wuhan_coronavirus/DXY.json'
-  const CITIES_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/wuhan_coronavirus/DXY_detailed.json'
-  return Promise.all([
-    fetch(NAMES_URL).then(res => res.json()),
-    fetch(PROVINCES_URL).then(res => res.json()),
-    fetch(CITIES_URL).then(res => res.json())
-  ]).then(([names, provinces, cities]) => {
-    const provinceNames = {}
-    names.forEach(row => {
-      if (row.level_1) {
-        provinceNames[row.level_1].children.push(row)
-      } else {
-        row.children = []
-        provinceNames[row.id] = row
-      }
-    })
-    Object.keys(provinceNames).forEach(key => {
-      const value = provinceNames[key]
-      delete provinceNames[key]
-      provinceNames[value.name_chi] = value
-    })
-    provinces.forEach(row => {
-      row.matched = provinceNames[row.provinceName]
-    })
-    cities.forEach(row => {
-      const isCity = row.provinceName.endsWith('市')
-      const children = provinceNames[row.provinceName].children
-      let matched = children.find(c => c.name_chi === row.cityName)
-      if (!matched && isCity) matched = children.find(c => c.name_chi === row.cityName + '区')
-      if (!matched && !isCity) matched = children.find(c => c.name_chi === row.cityName + '市')
-      if (!matched && !isCity) matched = children.find(c => c.name_chi === row.cityName + '县')
-      if (!matched) {
-        const test = row.cityName.replace(/(自治)?(县|州)$/, '')
-        matched = children.find(c => c.name_chi.includes('自治') && c.name_chi.startsWith(test))
-      }
-      if (!matched) {
-        const correction = CORRECTIONS.find(c => c.provinceName === row.provinceName && c.givenName === row.cityName)
-        if (correction) {
-          if (Array.isArray(correction.correctName)) {
-            matched = []
-            correction.correctName.forEach(n => {
-              const found = children.find(c => c.name_chi === n)
-              if (found) matched.push(found)
-            })
-          } else {
-            matched = children.find(c => c.name_chi === correction.correctName)
-          }
-        }
-      }
-      row.matched = matched
-    })
-    const totalCases = provinces.reduce((sum, row) => sum + row.confirmedCount, 0)
-    const lastUpdated = provinces.reduce((max, row) => row.modifyTime > max ? row.modifyTime : max, '')
-    cities.forEach(row => {
-      if (row.matched) return
-      if (MUNICIPALITIES.includes(row.provinceName)) return
-      console.log(row.provinceName, row.cityName)
-    })
-    return [provinces, cities, totalCases, lastUpdated]
-  })
 }
 
 function createPopup (Content, options) {

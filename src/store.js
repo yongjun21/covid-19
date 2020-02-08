@@ -4,8 +4,9 @@ import { TRANSLATE, CORRECTIONS, MUNICIPALITIES } from './constants'
 
 const store = Vue.observable({
   data: {},
-  loaded: 0,
-  totalCases: null,
+  total: [],
+  dates: [],
+  ready: false,
   lastUpdated: null
 })
 export default store
@@ -17,7 +18,7 @@ const NAMES_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/1
 const SUMMARY_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/2019-ncov/timeseries.json'
 const DETAIL_URL = 'https://s3-st-graphics-json.s3-ap-southeast-1.amazonaws.com/2019-ncov/cities-timeseries/'
 
-Promise.all([
+store.initialize = () => Promise.all([
   fetch(NAMES_URL).then(res => res.json()),
   fetch(SUMMARY_URL).then(res => res.json()),
   fetch(DETAIL_URL + yesterday + '.json').then(res => res.json())
@@ -32,11 +33,11 @@ Promise.all([
     }
   })
 
-  const maxDate = summary.reduce((max, row) => row.date > max ? row.date : max, '2020-01-23')
-  store.totalCases = summary.reduce((sum, row) => sum + (row.date === maxDate && row.country ? row.cases : 0), 0)
+  store.dates.push(yesterday)
+  const total = summary.reduce((sum, row) => sum + (row.date === yesterday && row.country ? row.cases : 0), 0)
+  store.total.push(total)
   store.lastUpdated = detail.reduce((max, row) => row.modifyTime > max ? row.modifyTime : max, '2020-01-23')
 
-  summary = summary.filter(row => row.province)
   prepareSummary(summary, provinceNames)
   prepareDetail(detail, provinceNames)
 
@@ -48,7 +49,7 @@ Promise.all([
         id: row.matched.id,
         name: row.provinceName,
         lvl: row.matched.level,
-        confirmed: [row.confirmedCount]
+        cases: [row.confirmedCount]
       })
     }
   })
@@ -59,13 +60,46 @@ Promise.all([
         id: row.matched.id,
         name: row.cityName,
         lvl: row.matched.level,
-        confirmed: [row.confirmedCount]
+        cases: [row.confirmedCount]
       })
     }
   })
-  store.loaded++
 
-  fetchRemaining(summary, provinceNames)
+  store.continue = function () {
+    const next = countdown.next()
+
+    if (next.done) {
+      store.ready = true
+      return
+    }
+
+    store.dates.push(next.value)
+    const total = summary.reduce((sum, row) => sum + (row.date === next.value && row.country ? row.cases : 0), 0)
+    store.total.push(total)
+
+    return fetch(DETAIL_URL + next.value + '.json').then(res => res.json())
+      .then(detail => {
+        prepareDetail(detail, provinceNames)
+        summary.forEach(row => {
+          if (!row.matched) return
+          if (row.date !== next.value) return
+          if (MUNICIPALITIES.includes(row.provinceName)) {
+            store.data[row.matched.id].cases.push(row.confirmedCount)
+          }
+        })
+        detail.forEach(row => {
+          if (!row.matched) return
+          if (!MUNICIPALITIES.includes(row.provinceName)) {
+            if (!(row.matched.id in store.data)) return
+            store.data[row.matched.id].cases.push(row.confirmedCount)
+          }
+        })
+        store.loaded++
+        return store.continue()
+      })
+  }
+
+  return store
 })
 
 function * getCountdown (until) {
@@ -81,6 +115,7 @@ function * getCountdown (until) {
 
 function prepareSummary (summary, provinceNames) {
   summary.forEach(row => {
+    if (!row.province) return
     row.provinceName = TRANSLATE[row.province]
     row.confirmedCount = row.cases
     row.matched = provinceNames[row.provinceName]
@@ -120,29 +155,4 @@ function prepareDetail (detail, provinceNames) {
     row.matched = matched
   })
   return detail
-}
-
-function fetchRemaining (summary, provinceNames) {
-  const next = countdown.next()
-  if (next.done) return
-  return fetch(DETAIL_URL + next.value + '.json').then(res => res.json())
-    .then(detail => {
-      prepareDetail(detail, provinceNames)
-      summary.forEach(row => {
-        if (!row.matched) return
-        if (row.date !== next.value) return
-        if (MUNICIPALITIES.includes(row.provinceName)) {
-          store.data[row.matched.id].confirmed.push(row.confirmedCount)
-        }
-      })
-      detail.forEach(row => {
-        if (!row.matched) return
-        if (!MUNICIPALITIES.includes(row.provinceName)) {
-          if (!(row.matched.id in store.data)) return
-          store.data[row.matched.id].confirmed.push(row.confirmedCount)
-        }
-      })
-      store.loaded++
-      return fetchRemaining(summary, provinceNames)
-    })
 }

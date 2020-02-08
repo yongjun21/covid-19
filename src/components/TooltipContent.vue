@@ -1,12 +1,12 @@
 <template>
   <div class="tooltip-content" v-if="data">
-    <template v-if="data[1].name">
-      {{data[1].name}}
+    <template v-if="data.state.name && data.state.cases > 0">
+      {{data.state.name}}
       <br>
-      <small>确证病例</small> {{data[1].confirmed}} <small>起</small>
+      <small>确证病例</small> {{data.state.cases.toLocaleString()}} <small>起</small>
     </template>
     <template v-else>
-      {{data[0].name_chi_short}}
+      {{data.properties.name_chi_short}}
     </template>
   </div>
 </template>
