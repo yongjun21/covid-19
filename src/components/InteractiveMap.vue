@@ -79,10 +79,12 @@ export default {
       minZoom: 4,
       maxZoom: 8,
       scrollZoom: !this.progress,
-      dragPan: true,
+      dragPan: !this.progress || this.window.innerWidth >= 640,
       dragRotate: false,
+      pitchWithRotate: false,
       accessToken: 'pk.eyJ1IjoieW9uZ2p1bjIxIiwiYSI6ImNpdTY5c2tyZzBqaDgyemxwYjk0Nnlic2UifQ.A5OHCYPcLTupbo1Qi3t5OQ'
     }, CHINA))
+    map.touchZoomRotate.disableRotation()
 
     const nav = new mapboxgl.NavigationControl({ showCompass: false })
     map.addControl(nav, 'top-right')
