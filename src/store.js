@@ -6,7 +6,6 @@ const store = Vue.observable({
   data: {},
   total: [],
   dates: [],
-  ready: false,
   lastUpdated: null
 })
 export default store
@@ -68,10 +67,7 @@ store.initialize = () => Promise.all([
   store.continue = function () {
     const next = countdown.next()
 
-    if (next.done) {
-      store.ready = true
-      return
-    }
+    if (next.done) return
 
     store.dates.push(next.value)
     const total = summary.reduce((sum, row) => sum + (row.date === next.value && row.country ? row.cases : 0), 0)

@@ -4,7 +4,10 @@
       新型冠状病毒肺炎
       <br v-if="window.innerWidth < 640">
       境内确证病例分布图
-      <template v-if="date && totalCases"><br><strong>{{date | formatDate}}</strong> <small>全球累积确证:</small> <strong>{{totalCases | formatNumber}}</strong></template>
+      <template v-if="date && totalCases">
+        <br>
+        <strong>{{date | formatDate}}</strong> <small>全球累积确证:</small> <strong>{{totalCases | formatNumber}}</strong>
+      </template>
     </span>
     <span class="attribution">
       <strong>数据来源</strong>: <a href="https://ncov.dxy.cn/ncovh5/view/pneumonia">丁香园</a>
@@ -24,14 +27,13 @@ import store from '../store'
 
 import TooltipContent from './TooltipContent'
 
+const DOMAIN = { color: [0, 1000] }
 const GAMMA = { color: 0.2, height: 0.33 }
 
 const CHINA = {
   center: window.innerWidth < 640 ? [114.384695, 30.667099] : [104.1375915, 31.1040363],
   zoom: 4
 }
-
-store.initialize().then(() => store.continue())
 
 export default {
   props: ['progress'],
@@ -63,6 +65,12 @@ export default {
       return `${m}月${d}日`
     }
   },
+  created () {
+    this.storeInitialized = store.initialize()
+    if (this.progress) {
+      this.storeFullyLoaded = this.storeInitialized.then(() => store.continue())
+    }
+  },
   mounted () {
     const map = new mapboxgl.Map(Object.assign({
       container: this.$el,
@@ -70,7 +78,7 @@ export default {
       pitch: 40,
       minZoom: 4,
       maxZoom: 8,
-      scrollZoom: false,
+      scrollZoom: !this.progress,
       dragPan: true,
       dragRotate: false,
       accessToken: 'pk.eyJ1IjoieW9uZ2p1bjIxIiwiYSI6ImNpdTY5c2tyZzBqaDgyemxwYjk0Nnlic2UifQ.A5OHCYPcLTupbo1Qi3t5OQ'
@@ -85,7 +93,7 @@ export default {
       closeOnClick: false
     })
 
-    const colorScale = chroma.scale('OrRd').gamma(GAMMA.color).domain([0, 1000])
+    const colorScale = chroma.scale('OrRd').gamma(GAMMA.color).domain(DOMAIN.color)
 
     map.on('load', () => {
       map.addSource('china', {
@@ -93,22 +101,48 @@ export default {
         url: 'mapbox://yongjun21.china'
       })
 
-      function renderState () {
-        const n = store.dates.length
-        this.$watch('progress', progress => {
-          const p = progress(true)
-          let index = Math.floor(p * (n - 1))
-          const t = p * (n - 1) - index
-          index = n - 1 - index
+      if (this.progress) {
+        this.storeFullyLoaded.then(() => {
+          const n = store.dates.length
+          this.$watch('progress', progress => {
+            const p = progress(true)
+            let index = Math.floor(p * (n - 1))
+            const t = p * (n - 1) - index
+            index = n - 1 - index
+            Object.values(store.data).forEach(row => {
+              const b = row.cases[index] || 0
+              const a = (index === n - 1) ? b : row.cases[index + 1] || 0
+              const interpolated = a * (1 - t) + b * t
+              const state = {
+                name: row.name,
+                cases: a,
+                height: interpolated,
+                color: colorScale(interpolated).hex()
+              }
+              map.setFeatureState({
+                source: 'china',
+                sourceLayer: 'china_boundaries_l' + row.lvl,
+                id: row.id
+              }, state)
+              map.setFeatureState({
+                source: 'china',
+                sourceLayer: 'china_places_l' + row.lvl,
+                id: row.id
+              }, state)
+            })
+            this.date = store.dates[index]
+            this.totalCases = store.total[index]
+          }, { immediate: true })
+        })
+      } else {
+        this.storeInitialized.then(() => {
           Object.values(store.data).forEach(row => {
-            const b = row.cases[index] || 0
-            const a = (index === n - 1) ? b : row.cases[index + 1] || 0
-            const interpolated = a * (1 - t) + b * t
+            const v = row.cases[0] || 0
             const state = {
               name: row.name,
-              cases: a,
-              height: interpolated,
-              color: colorScale(interpolated).hex()
+              cases: v,
+              height: v,
+              color: colorScale(v).hex()
             }
             map.setFeatureState({
               source: 'china',
@@ -121,13 +155,10 @@ export default {
               id: row.id
             }, state)
           })
-          this.date = store.dates[index]
-          this.totalCases = store.total[index]
-        }, { immediate: true })
+          this.date = store.dates[0]
+          this.totalCases = store.total[0]
+        })
       }
-
-      if (store.ready) renderState.call(this)
-      else this.$watch(() => store.ready, renderState.bind(this))
 
       map.addLayer({
         id: 'l1_data',

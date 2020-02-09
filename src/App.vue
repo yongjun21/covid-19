@@ -1,30 +1,19 @@
 <template>
   <div id="app">
-    <st-scrolly>
-      <template v-slot:background="{progress}">
-        <interactive-map :progress="progress"></interactive-map>
-      </template>
-    </st-scrolly>
+    <router-view></router-view>
   </div>
 </template>
 
 <script>
-import '@st-graphics/scrolly/dist/bundle.css'
-import StScrolly from '@st-graphics/scrolly'
-import InteractiveMap from './components/InteractiveMap.vue'
-
 export default {
-  name: 'app',
-  components: {
-    StScrolly,
-    InteractiveMap
-  }
+  name: 'app'
 }
 </script>
 
 <style lang="scss">
 html,
-body {
+body,
+#app {
   height: 100%;
   margin: 0;
 }
@@ -35,9 +24,5 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
   color: #2c3e50;
-
-  .slide {
-    height: 2400px;
-  }
 }
 </style>
