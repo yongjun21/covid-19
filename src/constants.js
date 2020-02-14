@@ -33,7 +33,16 @@ export const TRANSLATE = {
 }
 
 export const CORRECTIONS = [
-  { provinceName: '黑龙江省', givenName: '大兴安岭', correctName: '大兴安岭地区' }
+  { provinceName: '黑龙江省', givenName: '大兴安岭', correctName: '大兴安岭地区' },
+  { provinceName: '新疆维吾尔自治区', givenName: '兵团第四师', correctName: '可克达拉市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '第六师', correctName: '五家渠市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '兵团第六师五家渠市', correctName: '五家渠市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '第七师', correctName: '克拉玛依市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '兵团第七师', correctName: '克拉玛依市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '第八师', correctName: '石河子市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '第八师石河子', correctName: '石河子市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '第八师石河子市', correctName: '石河子市' },
+  { provinceName: '新疆维吾尔自治区', givenName: '兵团第八师石河子市', correctName: '石河子市' },
 ]
 
 export const MUNICIPALITIES = ['北京市', '天津市', '上海市', '重庆市']

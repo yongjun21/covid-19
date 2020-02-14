@@ -145,7 +145,7 @@ function prepareDetail (detail, provinceNames) {
         }
       }
     }
-    // if (!matched && !MUNICIPALITIES.includes(row.provinceName)) {
+    // if (!matched && !MUNICIPALITIES.includes(row.provinceName) && row.cityName !== '待明确地区') {
     //   console.log(row.provinceName, row.cityName)
     // }
     row.matched = matched
