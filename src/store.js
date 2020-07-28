@@ -35,7 +35,7 @@ store.initialize = () => Promise.all([
   store.dates.push(yesterday)
   const total = summary.reduce((sum, row) => sum + (row.date === yesterday && row.country ? row.cases : 0), 0)
   store.total.push(total)
-  store.lastUpdated = detail.reduce((max, row) => row.modifyTime > max ? row.modifyTime : max, '2020-01-23')
+  store.lastUpdated = detail.reduce((max, row) => row.modifyTime > max ? row.modifyTime : max, '')
 
   prepareSummary(summary, provinceNames)
   prepareDetail(detail, provinceNames)
@@ -99,7 +99,7 @@ store.initialize = () => Promise.all([
 })
 
 function * getCountdown (until) {
-  const d = new Date()
+  const d = new Date(2020, 2, 1)
   d.setHours(d.getHours() + 8)
   let next
   do {

@@ -10,20 +10,20 @@
   "dependencies": {
     "@st-graphics/scrolly": "0.0.7",
     "chroma-js": "^2.1.0",
-    "core-js": "^3.4.4",
-    "mapbox-gl": "^1.7.0",
+    "core-js": "^3.6.5",
+    "mapbox-gl": "^1.11.1",
     "vue": "^2.6.10",
-    "vue-router": "^3.1.5"
+    "vue-router": "^3.3.4"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^4.1.0",
-    "@vue/cli-plugin-eslint": "^4.1.0",
-    "@vue/cli-service": "^4.1.0",
+    "@vue/cli-plugin-babel": "^4.4.6",
+    "@vue/cli-plugin-eslint": "^4.4.6",
+    "@vue/cli-service": "^4.4.6",
     "@vue/eslint-config-standard": "^4.0.0",
-    "babel-eslint": "^10.0.3",
+    "babel-eslint": "^10.1.0",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.0.0",
-    "sass": "^1.23.7",
+    "sass": "^1.26.10",
     "sass-loader": "^8.0.0",
     "vue-template-compiler": "^2.6.10"
   },
